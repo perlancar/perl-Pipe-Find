@@ -90,17 +90,17 @@ sub get_stdout_pipe_process {
  use Pipe::Find qw(find_pipe_processes get_stdout_pipe_process);
  $procs = find_pipe_processes(); # hashref, key=fd, value=process info hash
 
- if ($res->{0}) {
+ if ($procs->{0}) {
      say "STDIN is connected to a pipe";
      say "pid=$procs->{0}{pid}";
      say "cmdline=$procs->[0]{cmdline}";
      say "exe=$procs->[0]{exe}";
  }
- if ($res->{1}) {
+ if ($procs->{1}) {
      say "STDOUT is connected to a pipe";
      ...
  }
- if ($res->{3}) {
+ if ($procs->{3}) {
      say "STDERR is connected to a pipe";
      ...
  }
