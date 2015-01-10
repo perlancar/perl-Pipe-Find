@@ -18,9 +18,19 @@ our @EXPORT_OK = qw(
 sub find_pipe_processes {
     my $mypid = shift // $$;
 
-    state $pt = do {
-        require Proc::ProcessTable;
-        Proc::ProcessTable->new;
+    my %procinfos;
+    my $get_proc_info = sub {
+        my $pid = shift;
+        return $procinfos{$pid} if $procinfos{$pid};
+        $procinfos{$pid} = {
+            pid     => $pid,
+            exe     => readlink("/proc/$pid/exe"),
+            cmdline => do {
+                local $/;
+                open my($fh), "<", "/proc/$pid/cmdline";
+                ~~<$fh>;
+            },
+        };
     };
 
     my $procs = {};
@@ -32,10 +42,10 @@ sub find_pipe_processes {
         my %pipes_by_fd;
         my %fds_by_pipe;
         for my $fd (readdir $dh) {
-            my $l = readlink "/proc/$mypid/fd/$fd";
-            next unless $l && $l =~ /\Apipe:/;
-            $pipes_by_fd{$fd} = $l;
-            $fds_by_pipe{$l} = $fd;
+            my $pipe = readlink "/proc/$mypid/fd/$fd";
+            next unless $pipe && $pipe =~ /\Apipe:/;
+            $pipes_by_fd{$fd} = $pipe;
+            $fds_by_pipe{$pipe} = $fd;
         }
         last unless keys %pipes_by_fd;
         for my $fd (keys %pipes_by_fd) { $procs->{$fd} = undef }
@@ -47,28 +57,18 @@ sub find_pipe_processes {
       PID:
         for my $opid (@pids) {
             opendir $dh, "/proc/$opid/fd" or next PID;
-            for my $fd (readdir $dh) {
-                my $l = readlink "/proc/$opid/fd/$fd";
-                next unless $l && $l =~ /\Apipe:/;
-                next if $opid == $mypid && $fd == $fds_by_pipe{$l};
-                my $fd = $fds_by_pipe{$l} or next;
-                $procs->{$fd} = {pid=>$opid};
-                $fds_by_pid{$opid} = $fd;
+            for my $ofd (readdir $dh) {
+                my $pipe = readlink "/proc/$opid/fd/$ofd";
+                next unless $pipe && $pipe =~ /\Apipe:/;
+                next if $opid == $mypid && $ofd == $fds_by_pipe{$pipe};
+                my $fd = $fds_by_pipe{$pipe} or next;
+                $procs->{$fd} = $get_proc_info->($opid);
+                push @{ $fds_by_pid{$opid} }, $fd;
                 delete $pipes_by_fd{$fd};
             }
             last PID unless keys %pipes_by_fd;
         }
 
-        my $table = $pt->table;
-      TABLE:
-        for my $procinfo (@{ $table }) {
-            if (defined( my $fd = $fds_by_pid{ $procinfo->{pid} })) {
-                # XXX unbless?
-                $procs->{$fd} = $procinfo;
-                delete $fds_by_pid{$fd};
-                last TABLE unless keys %fds_by_pid;
-            }
-        }
     }
 
     $procs;
@@ -92,7 +92,9 @@ sub get_stdout_pipe_process {
 
  if ($res->{0}) {
      say "STDIN is connected to a pipe";
-     say "pid=$procs->{0}{pid} cmd=$procs->[0]{cmndline}";
+     say "pid=$procs->{0}{pid}";
+     say "cmdline=$procs->[0]{cmdline}";
+     say "exe=$procs->[0]{exe}";
  }
  if ($res->{1}) {
      say "STDOUT is connected to a pipe";
@@ -119,8 +121,7 @@ pipes for another process by passing its PID.)
 
 Currently only works on Linux. Works by listing C</proc/$$/fd> and selecting all
 fd's that symlinks to C<pipe:*>. Then it will list all C</proc/*/fd> and find
-matching pipes. Finally it will run L<Proc::ProcessTable> to find the process
-info.
+matching pipes.
 
 STDIN pipe is at fd 0, STDOUT pipe at fd 1, STDERR at fd 2.
 
