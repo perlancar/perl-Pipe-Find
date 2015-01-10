@@ -1,5 +1,12 @@
 Revision history for Pipe-Find
 
+0.02    2015-01-10 (PERLANCAR)
+
+	- No longer uses Proc::ProcessTable to become lighter, now only
+	  grabs /proc/PID/{cmdline,exe} (besides, usually what we need is
+	  just process name/path).
+
+
 0.01    2015-01-10 (PERLANCAR)
 
         - First release.
