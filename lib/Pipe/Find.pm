@@ -93,14 +93,14 @@ sub get_stdout_pipe_process {
  if ($procs->{0}) {
      say "STDIN is connected to a pipe";
      say "pid=$procs->{0}{pid}";
-     say "cmdline=$procs->[0]{cmdline}";
-     say "exe=$procs->[0]{exe}";
+     say "cmdline=$procs->{0}{cmdline}";
+     say "exe=$procs->{0}{exe}";
  }
  if ($procs->{1}) {
      say "STDOUT is connected to a pipe";
      ...
  }
- if ($procs->{3}) {
+ if ($procs->{2}) {
      say "STDERR is connected to a pipe";
      ...
  }
