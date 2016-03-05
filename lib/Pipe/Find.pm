@@ -28,7 +28,7 @@ sub find_pipe_processes {
             cmdline => do {
                 local $/;
                 open my($fh), "<", "/proc/$pid/cmdline";
-                ~~<$fh>;
+                scalar <$fh>;
             },
         };
     };
@@ -36,9 +36,7 @@ sub find_pipe_processes {
     my $procs = {};
   FIND:
     {
-        my $dh;
-
-        opendir $dh, "/proc/$mypid/fd" or last;
+        opendir my($dh), "/proc/$mypid/fd" or last;
         my %pipes_by_fd;
         my %fds_by_pipe;
         for my $fd (readdir $dh) {
